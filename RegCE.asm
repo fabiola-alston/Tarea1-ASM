@@ -1,3 +1,4 @@
+
 ; Proyecto en TASM 8086
 
 .MODEL SMALL
@@ -20,6 +21,21 @@ DATA_SEG    SEGMENT ; Inicia el segmento de datos, para almacenar mensajes estat
     MSG8    DB  13,10,'    Porcentaje(%) $'
     MSG9    DB  10,13,10,'Digite numero de estudiante a mostrar $'
     MSG10   DB  10,13,10, "Como desea ordenar las calificaciones:", 0ah,"", 0ah, "1. Orden Ascendente.", 0ah, "2. Orden Descendente.", 0ah, "$"
+    
+    PROMPT_NOMBRE DB 13,10,'Nombre: $'
+    PROMPT_AP1 DB 13,10,'Apellido1: $'
+    PROMPT_AP2 DB 13,10,'Apellido2: $'
+    PROMPT_NOTA DB 13,10,'Nota (como texto, ej. 80.80): $'
+    
+    NAME_BUF DB 30,0,30 DUP(0)
+    AP1_BUF DB 20,0,20 DUP(0)
+    AP2_BUF DB 20,0,20 DUP(0)
+    NOTE_BUF DB 10,0,10 DUP(0)
+    
+    CONFIRM_1 DB 13,10,'Ingresado -> ', '$'
+    SPC DB ' ', '$'
+    LABEL_NOTA DB 13,10,'Nota: ', '$'
+    CRLF DB 13,10,'$'
     
  
     
@@ -73,6 +89,88 @@ ITS_SORT_CAL:
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
             INT 21H            ; llama a la interrupcion 21H de DOS
             
+            ; ===== Nombre =====
+            LEA DX, PROMPT_NOMBRE
+            MOV AH, 09h
+            INT 21h
+
+
+            LEA DX, NAME_BUF
+            MOV AH, 0Ah ; leer cadena (buffer estilo 0Ah)
+            INT 21h
+            
+            ; ===== Apellido1 =====
+            LEA DX, PROMPT_AP1
+            MOV AH, 09h
+            INT 21h
+
+
+            LEA DX, AP1_BUF
+            MOV AH, 0Ah
+            INT 21h
+            
+            ; ===== Apellido2 =====
+            LEA DX, PROMPT_AP2
+            MOV AH, 09h
+            INT 21h
+
+
+            LEA DX, AP2_BUF
+            MOV AH, 0Ah
+            INT 21h
+
+
+            ; ===== Nota (texto) =====
+            LEA DX, PROMPT_NOTA
+            MOV AH, 09h
+            INT 21h
+
+
+            LEA DX, NOTE_BUF
+            MOV AH, 0Ah
+            INT 21h
+
+
+            ; [ADDED] ? Eco de lo ingresado (convierte buffers 0Ah a '$' y los imprime)
+            LEA DX, CONFIRM_1
+            MOV AH, 09h
+            INT 21h
+
+
+            ; Imprime: Nombre Apellido1 Apellido2
+            LEA DX, NAME_BUF
+            CALL PrintInputBuffer
+            LEA DX, SPC
+            MOV AH, 09h
+            INT 21h
+
+
+            LEA DX, AP1_BUF
+            CALL PrintInputBuffer
+            LEA DX, SPC
+            MOV AH, 09h
+            INT 21h
+
+
+            LEA DX, AP2_BUF
+            CALL PrintInputBuffer
+
+
+            ; Imprime: Nota
+            LEA DX, LABEL_NOTA
+            MOV AH, 09h
+            INT 21h
+
+
+            LEA DX, NOTE_BUF
+            CALL PrintInputBuffer
+
+
+            LEA DX, CRLF
+            MOV AH, 09h
+            INT 21h
+            
+            
             JMP MENU_LOOP          ;ESTO POR AHORA QUE NO HAY NADA QUITAR DESPUES
 
     
@@ -124,8 +222,53 @@ ITS_SORT_CAL:
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
             INT 21H            ; llama a la interrupcion 21H de DOS
             
+            MOV AH, 01h
+            INT 21h ; AL = '1' o '2'
+            SUB AL, 30h ; a valor num?rico 1/2
+            
             JMP MENU_LOOP          ;ESTO POR AHORA QUE NO HAY NADA QUITAR DESPUES
-    
+
+;////////////////////////////////////////////////////////////////       SUBRUTINAS DE SOPORTE //////////////////////////////////////////////////////////
+
+; Convierte un buffer le?do con INT 21h/0Ah a cadena '$' y lo imprime con AH=09h.
+; Entrada: DX = direcci?n del buffer (est?ndar 0Ah: [max][len][data..][0Dh])
+PrintInputBuffer PROC
+PUSH AX
+PUSH BX
+PUSH CX
+PUSH DX
+PUSH SI
+PUSH DI
+
+
+MOV BX, DX ; BX = base del buffer
+MOV AL, [BX+1] ; AL = longitud real digitada
+XOR AH, AH
+MOV CX, AX ; CX = longitud
+
+
+LEA SI, [BX+2] ; SI = inicio de los datos
+MOV DI, SI
+ADD DI, CX ; DI = posici?n despu?s del ?ltimo car?cter
+
+
+MOV BYTE PTR [DI], '$' ; sobrescribe el 0Dh con '$'
+
+
+MOV DX, SI ; DX -> datos ya terminados con '$'
+MOV AH, 09h
+INT 21h
+
+
+POP DI
+POP SI
+POP DX
+POP CX
+POP BX
+POP AX
+RET
+PrintInputBuffer ENDP         
+
 ;////////////////////////////////////////////////////////////////       SALIR       ///////////////////////////////////////////////////////////////////
     EXIT_PROGRAM:
             ; Muestra el mensaje de salida
