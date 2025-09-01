@@ -11,7 +11,7 @@ DATA_SEG    SEGMENT ; Inicia el segmento de datos, para almacenar mensajes estat
     WELC_MSG db 0ah, 0dh, "***************  Bienvenido a RegistroCE  ***************", 0ah,"",0ah, "$"
     EXIT_MSG db 0ah, 0dh, "", 0ah,"*************  Gracias por usar RegistroCE  *************",0ah, "$" 
     
-    MSG1    DB  10,13,10,'Por favor ingrese su estudiante o digite 9 para salir al menu principal $' 
+    MSG1    DB  10,13,10,'Digite 1 para ingresar su estudiante o digite 9 para ir al menu principal', 0ah, '$' 
     MSG2    DB  10,13,10,'El promedio de notas de los estudiantes ingresados es: $'
     MSG3    DB  13,10,'La nota maxima de los estudiantes ingresados es: $'
     MSG4    DB  13,10,'La nota minima de los estudiantes ingresados es: $'
@@ -83,12 +83,25 @@ ITS_SORT_CAL:
     JMP SORT_CAL       ; salta a ordnar calificaciones
     
             
-    ;//////////////////////////////////////////////////////////////// INGRESAR CALIFICACION ////////////////////////////////////////////////////////////           
+    ;//////////////////////////////////////////////////////////////// SUBMENU INGRESAR CALIFICACION ////////////////////////////////////////////////////////////           
     ENTER_GRADES:
             LEA DX, MSG1       ; carga la direcci?n del mensaje 1 en DX
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
             INT 21H            ; llama a la interrupcion 21H de DOS
             
+            MOV AH, 01H        ; lee un caracter del teclado
+            INT 21H            ; llama a la interrupcion 21H de DOS
+
+            SUB AL, 30H        ; convierte el caracter ingresado por el usuario ASCII a su equivalente num?rico
+            
+            CMP AL, 1          ; compara el valor ingresado con 1
+            JE REGISTER    ; salta a REGISTER si es igual a 1
+            CMP AL, 9          ; compara el valor ingresado con 2
+            JE MENU_LOOP   ; salta al menu si es 9
+
+   ;//////////////////////////////////////////////////////////////// REGISTAR CALIFICACION ////////////////////////////////////////////////////////////                
+    REGISTER:
+   
             ; ===== Nombre =====
             LEA DX, PROMPT_NOMBRE
             MOV AH, 09h
@@ -171,36 +184,36 @@ ITS_SORT_CAL:
             INT 21h
             
             
-            JMP MENU_LOOP          ;ESTO POR AHORA QUE NO HAY NADA QUITAR DESPUES
+            JMP ENTER_GRADES          ;ESTO POR AHORA QUE NO HAY NADA QUITAR DESPUES
 
     
 ;//////////////////////////////////////////////////////////////// MOSTRAR ESTADISTICAS ////////////////////////////////////////////////////////////////    
     STATISTICS:
-            LEA DX, MSG2       ; carga la direcci?n del mensaje 1 en DX
+            LEA DX, MSG2       ; carga la direcci?n del mensaje 2:promedio en DX
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
             INT 21H            ; llama a la interrupcion 21H de DOS
             
-            LEA DX, MSG3       ; carga la direcci?n del mensaje 1 en DX
+            LEA DX, MSG3       ; carga la direcci?n del mensaje 3: nota max en DX
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
             INT 21H            ; llama a la interrupcion 21H de DOS
             
-            LEA DX, MSG4       ; carga la direcci?n del mensaje 1 en DX
+            LEA DX, MSG4       ; carga la direcci?n del mensaje 4: nota min en DX
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
             INT 21H            ; llama a la interrupcion 21H de DOS
             
-            LEA DX, MSG5       ; carga la direcci?n del mensaje 1 en DX
+            LEA DX, MSG5       ; carga la direcci?n del mensaje 5: aprobados en DX
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
             INT 21H            ; llama a la interrupcion 21H de DOS
             
-            LEA DX, MSG6       ; carga la direcci?n del mensaje 1 en DX
+            LEA DX, MSG6       ; carga la direcci?n del mensaje 6: % en DX
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
             INT 21H            ; llama a la interrupcion 21H de DOS
             
-            LEA DX, MSG7       ; carga la direcci?n del mensaje 1 en DX
+            LEA DX, MSG7       ; carga la direcci?n del mensaje 7: reprobados en DX
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
             INT 21H            ; llama a la interrupcion 21H de DOS
             
-            LEA DX, MSG8       ; carga la direcci?n del mensaje 1 en DX
+            LEA DX, MSG8       ; carga la direcci?n del mensaje 8: % en DX
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
             INT 21H            ; llama a la interrupcion 21H de DOS
             
