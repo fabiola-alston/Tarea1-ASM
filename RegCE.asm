@@ -22,7 +22,7 @@ DATA_SEG    SEGMENT
     MSG11    DB  13,10,'    DEBUGGG $'
     MSG12    DB  13,10,'    DEBUGGG2 $'
     
-    ; Nuevas variables para manejo de estudiantes
+    ; Manejo de estudiantes
     ESTUDIANTES db 15 dup(20 dup(' '), 20 dup(' '), 20 dup(' '), 0) ; Array de estudiantes
     CONTADOR_ESTUDIANTES db 0
     NOTA_BUFFER db 9, 0, 9 dup('$')  ; Buffer para entrada de nota
@@ -314,7 +314,7 @@ LL_ORD_NOTAS:
         
         ; Copiar nota
         MOV AL, [NUMERO]
-        MOV [SI], AL
+        MOV [DI], AL          ; Guardar la nota en la posici?n actual de DI
         
         RET
     GUARDAR_ESTUDIANTE ENDP
@@ -326,6 +326,26 @@ LL_ORD_NOTAS:
             INT 21H            ; llama a la interrupcion 21H de DOS
             
             CALL PROMEDIO
+            
+            ; Mostrar parte entera
+            ;MOV BL, AL       ; Guardar promedio
+            ;MOV AL, BL
+            ;CALL MOSTRAR_NUMERO  ; Procedimiento que mostr? antes
+
+            ; Mostrar parte decimal
+            ;MOV DL, '.'
+            ;MOV AH, 02h
+            ;INT 21h
+
+            ;MOV AL, AH       ; Residuo
+            ;MOV BL, 10
+            ;MUL BL           ; AX = residuo * 10
+            ;MOV BL, CONTADOR_ESTUDIANTES
+            ;DIV BL           ; AL = d?cimas (0-9)
+            ;ADD AL, '0'
+            ;MOV DL, AL
+            ;MOV AH, 02h
+            ;INT 21h
             
             LEA DX, MSG3       ; carga la direcci?n del mensaje 3: nota max en DX
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
@@ -359,16 +379,37 @@ LL_ORD_NOTAS:
 
     PROMEDIO PROC
             
-            LEA DX, MSG6       ; carga la direcci?n del mensaje 6: % en DX
-            MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
-            INT 21H            ; llama a la interrupcion 21H de DOS
-    
-    
+           MOV CX, 15                  ; 15 estudiantes
+           LEA SI, ESTUDIANTES         ; SI apunta al inicio del array
+           ADD SI, 60                  ; Posicionar SI en la PRIMERA nota (byte 60)
+           XOR AX, AX                  ; AX = 0 (acumulador de la suma)
+
+        SUMA_NOTAS:
+           MOV BL, [SI]                ; Leer la nota actual (1 byte)
+           XOR BH, BH                  ; Limpiar BH para extender BL a 16 bits
+           ADD AX, BX                  ; Sumar nota al acumulador
+                
+           ADD SI, 61                  ; Avanzar al siguiente estudiante (61 bytes)
+           LOOP SUMA_NOTAS             ; Repetir para los 15 estudiantes
+           
+           MOV BL, CONTADOR_ESTUDIANTES  ; Numero de estudiantes registrados
+           XOR AH, AH                    ; Pone el ah en 0
+           DIV BL                        ; AL = AX / estudiantes registrados (promedio)
+           
+           LEA DX, MSG11       ; carga la direcci?n del mensaje 3: nota max en DX
+           MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
+           INT 21H            ; llama a la interrupcion 21H de DOS
     
             RET
     PROMEDIO ENDP
     
+    ;//////////// SUBRUTINA PARA MOSTRAR EL NUMERO ////////////////////
     
+    
+    
+    
+    
+    ;//////////// SUBRUTINA PARA LA NOTA MAXIMA ////////////////////
     NOTAMAX PROC
             
             LEA DX, MSG6       ; carga la direcci?n del mensaje 6: % en DX
