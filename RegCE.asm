@@ -13,8 +13,8 @@ DATA_SEG    SEGMENT ; Inicia el segmento de datos, para almacenar mensajes estat
     
     MSG1    DB  10,13,10,'digite 1 para ingresar a su estudiante o digite 9 para salir al menu principal $' 
     MSG2    DB  10,13,10,'El promedio de notas de los estudiantes ingresados es: $'
-    MSG3    DB  13,10,'La nota maxima de los estudiantes ingresados es: $'
-    MSG4    DB  13,10,'La nota minima de los estudiantes ingresados es: $'
+    MSG3    DB  13,10,'La nota maxima es: $'
+    MSG4    DB  13,10,'La nota minima: $'
     MSG5    DB  13,10,'La cantidad de estudiantes aprobados es: $'
     MSG6    DB  13,10,'    Porcentaje(%) $'
     MSG7    DB  13,10,'La cantidad de estudiantes reprobados es: $'
@@ -39,9 +39,11 @@ DATA_SEG    SEGMENT ; Inicia el segmento de datos, para almacenar mensajes estat
     NAME_BUF DB 42,0,42 DUP(0)
     NOTA DW 0 ;NOTA DE ENTERO
     MUL_FAC DB  10
+    NOTA_MAX  DB 0
+    NOTA_MIN  DB 0
     
-    ESTUDIANTES_R DB 15 DUP(49 DUP(0)) ;Arreglo de todos los estudiantes
-    NOTAS_ARR DB 15 DUP (0)
+    ESTUDIANTES_R DB 15 DUP(43 DUP(0)) ;Arreglo de todos los estudiantes, sin nota
+    NOTAS_ARR DB 15 DUP (2 DUP(0)); Arreglo de las notas de los estudiantes
      
     CONFIRM_1 DB 13,10,'Ingresado -> ', '$'
     SPC DB ' ', '$'
@@ -195,10 +197,10 @@ ITS_SORT_CAL:
             ; EStructura: [(indice de estudiante, nombre estudiante, nota), (indice de estudiante, nombre estudiante, nota),]
             
             ; //////// Guardar CONT_EST en el primer byte de cada estudiante, ya que es su indice ///////
-            ; Calcular posici?n en el array: DI = ESTUDIANTES_R + (49 * K)
-            MOV AX, 49            ; Bytes por estudiante
+            ; Calcular posici?n en el array: DI = ESTUDIANTES_R + (43 * K)
+            MOV AX, 43            ; Bytes por estudiante
             MOV BL, K             ; ?ndice del estudiante
-            MUL BL                ; AX = 49 * K
+            MUL BL                ; AX = 43 * K
             LEA DI, ESTUDIANTES_R ; DI apunta al inicio del array
             ADD DI, AX            ; DI apunta al estudiante K
             
@@ -208,7 +210,7 @@ ITS_SORT_CAL:
             
             
             ; //////// Guardar el buffer con el nombre que es de tama?o 42, pero empezaria en el byte 1
-            ;calculo seria: (49*K) + 1
+            ;calculo seria: (43*K) + 1
             ADD DI, 1            ;Sumamos 1 para que apunte al nombre del estudiante K
             LEA SI, NAME_BUF + 2 ; Saltar bytes de control del buffer
             MOV CL, NAME_BUF + 1 ; N?mero de caracteres le?dos
@@ -230,22 +232,24 @@ ITS_SORT_CAL:
             MOV byte ptr [DI], '$'
             
             
-            ;/////// Guardar la nota, que es NOTA, este seria en el byte 43
-            ;calculo seria: (49*K) + 43
-            ; Calcular posici?n en el array: DI = ESTUDIANTES_R + (49 * K)
-            MOV AX, 49            ; Bytes por estudiante
+            
+            
+            ; Guardar nota e indice en el array de notas
+            ; //////// Guardar CONT_EST en el primer byte de cada nota, ya que es su indice ///////
+            ; Calcular posici?n en el array: DI = ESTUDIANTES_R + (2 * K)
+            MOV AX, 2             ; Bytes por estudiante
             MOV BL, K             ; ?ndice del estudiante
-            MUL BL                ; AX = 49 * K
-            LEA DI, ESTUDIANTES_R ; DI apunta al inicio del array
-            ADD DI, AX            ; DI apunta a la nota del estudiante K
+            MUL BL                ; AX = 2 * K
+            LEA DI, NOTAS_ARR     ; DI apunta al inicio del array
+            ADD DI, AX            ; DI apunta al estudiante K
             
-            MOV AX, [NOTA]          ; AX = valor de la nota (DW)
-            MOV [DI + 43], AX       ; Guardar en bytes 43-44  Le suma el desplazamiento
+            ; Guardar ?ndice en el PRIMER byte del estudiante
+            MOV AL, BYTE PTR CONT_EST    ; AL = ?ndice (1-15)
+            MOV [DI], AL          ; Va a la direccion que tiene guardada DI y guardar el primer byte (posici?n 1)
             
-            ; Guardar nota en el array de notas
-            MOV BL, K              ; BL = ?ndice del estudiante (0-14)
+            
             MOV AL, BYTE PTR [NOTA] ; AL = valor de la nota (como byte)
-            MOV NOTAS_ARR[BX], AL  ; Guardar en la posici?n K del array  
+            MOV [DI + 1], AL  ; Guardar en la posici?n K del array  
             
             JMP LIMPIAR_NOMBRE_BUF
             
@@ -308,14 +312,15 @@ ITS_SORT_CAL:
             MOV CH, 0             ; CH = 0 entonces CX = CONT_EST
             CMP CX, 0             ; Verificar si hay estudiantes
             JE PROM_ZERO          ; Si no hay, salta a prom cero
-            LEA DI, ESTUDIANTES_R ; Primer estudiante
+            LEA DI, NOTAS_ARR     ; Primer nota del estudiante
             MOV SUMA_NOTAS, 0
 
         SUMA:
-            MOV AX, [DI + 43]     ; Leer nota del estudiante actual
+            MOV AX, [DI + 1]     ; Leer nota del estudiante actual
+            MOV AH, 0            ; Extiende a word 
             ADD SUMA_NOTAS, AX    ; Sumar
             MOV BX, SUMA_NOTAS
-            ADD DI, 49            ; Siguiente estudiante
+            ADD DI, 2            ; Siguiente estudiante
             LOOP SUMA
            
             
@@ -376,13 +381,136 @@ ITS_SORT_CAL:
             ;NOTAS MAXIMAS Y MINIMAS
     
     NOTAS_MAX_MIN:
-            JMP BUBBLE_SORT
+            LEA DX, MSG3       ; carga la direcci?n del mensaje 3 en DX
+            MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
+            INT 21H            ; llama a la interrupcion 21H de DOS
             
             
-    BUBBLE_SORT:
+            CALL BUBBLE_SORT_NOTAS     ; llama al bubble sort para que ordene las notas de forma descendente
+            LEA DI, NOTAS_ARR          ; DI apunta al array
+            MOV AL, [DI + 1]
+            ;MOV NOTA_MAX, AL
+            CALL MOSTRAR_NUM
+            
+            LEA DX, MSG4       ; carga la direcci?n del mensaje 4 en DX
+            MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
+            INT 21H            ; llama a la interrupcion 21H de DOS
+            
+            MOV AL, CONT_EST       ; N?mero de estudiantes
+            DEC AL                 ; AL = ?ltimo ?ndice (0-based)
+            MOV BL, AL
+            MOV BH, 0              ; BX = ?ltimo ?ndice
+            
+            MOV AX, 2              ; Cada elemento ocupa 2 bytes
+            MUL BX                 ; AX = 2 * ?ltimo_?ndice
+            MOV BX, AX             ; BX = offset del ?ltimo elemento
+            
+            MOV AL, [DI + BX + 1]  ; ? Nota del ?ltimo elemento
+            ;MOV NOTA_MIN, AL
+            CALL MOSTRAR_NUM
+            
             JMP MENU_LOOP
             
+            ; ///////// SUBRUTINA PARA HACER BUBBLE SORT /////////        
+    BUBBLE_SORT_NOTAS PROC
+            PUSH AX
+            PUSH BX
+            PUSH CX
+            PUSH DX
+            PUSH SI
+            PUSH DI
             
+            MOV CX, 14                 ; 14 comparaciones
+            LEA SI, NOTAS_ARR          ; SI apunta al array
+
+        OUTER_LOOP:
+            MOV DX, CX                 ; Contador interno
+            LEA SI, NOTAS_ARR          ; Reiniciar puntero
+            MOV DI, 0                  ; Flag de cambios (0 = sin cambios)
+
+        INNER_LOOP:
+            ; Comparar NOTAS (byte 1 de cada par)
+            MOV AL, [SI + 1]           ; Nota actual
+            MOV BL, [SI + 3]           ; Nota siguiente
+            
+            CMP AL, BL                 ; Comparar notas
+            JAE NO_SWAP                ; Si actual >= siguiente, no swap
+            
+            ; SWAP COMPLETO de ambos pares
+            MOV AX, [SI]               ; AX = [?ndice_actual, nota_actual]
+            MOV BX, [SI + 2]           ; BX = [?ndice_sig, nota_sig]
+            XCHG AX, [SI + 2]          ; Intercambiar
+            MOV [SI], BX               ; Completar swap
+            MOV DI, 1                  ; Marcar que hubo cambio
+
+        NO_SWAP:
+            ADD SI, 2                  ; Siguiente elemento (+2 bytes)
+            DEC DX
+            JNZ INNER_LOOP
+            
+            ; Verificar si ya est? ordenado
+            CMP DI, 0                  ; ?Hubo cambios?
+            JE SORT_DONE               ; Si no hubo cambios, terminar
+            
+            LOOP OUTER_LOOP
+
+        SORT_DONE:
+            POP DI
+            POP SI
+            POP DX
+            POP CX
+            POP BX
+            POP AX
+            RET
+        BUBBLE_SORT_NOTAS ENDP
+  
+
+ ; ////// SUBRUTINA PARA MOSTRAR NUMEROS        
+     MOSTRAR_NUM PROC
+            ; AL = n?mero (0-100)
+            PUSH AX
+            PUSH BX
+            PUSH DX
+            
+            MOV AH, 0
+            CMP AL, 10
+            JB UN_DIGITO          ; Si < 10, mostrar un d?gito
+            CMP AL, 100
+            JE CIEN               ; Si = 100, mostrar "100"
+            
+            ; Mostrar dos d?gitos (10-99)
+            MOV BL, 10
+            DIV BL               ; AL = decenas, AH = unidades
+            ADD AX, 3030h        ; Convertir ambos a ASCII
+            MOV DX, AX           ; DL = decenas, DH = unidades
+            MOV AH, 02h
+            INT 21h              ; Mostrar decenas
+            MOV DL, DH
+            INT 21h              ; Mostrar unidades
+            JMP FIN_MOSTRAR
+            
+        UN_DIGITO:
+            ADD AL, '0'          ; Convertir a ASCII
+            MOV DL, AL
+            MOV AH, 02h
+            INT 21h
+            JMP FIN_MOSTRAR
+            
+        CIEN:
+            MOV DL, '1'
+            MOV AH, 02h
+            INT 21h
+            MOV DL, '0'
+            INT 21h
+            MOV DL, '0'
+            INT 21h
+
+        FIN_MOSTRAR:
+            POP DX
+            POP BX
+            POP AX
+            RET
+        MOSTRAR_NUM ENDP         
     
 ;//////////////////////////////////////////////////////////////// BUSCAR ESTUDIANTE POR POSICION //////////////////////////////////////////////////////   
     INDEX_SEARCH:
