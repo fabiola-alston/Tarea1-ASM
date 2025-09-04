@@ -1,5 +1,6 @@
 ; Proyecto en TASM 8086
 
+
 .MODEL SMALL
 .STACK 100h
 
@@ -40,6 +41,7 @@ DATA_SEG    SEGMENT ; Inicia el segmento de datos, para almacenar mensajes estat
     MUL_FAC DB  10
     
     ESTUDIANTES_R DB 15 DUP(49 DUP(0)) ;Arreglo de todos los estudiantes
+    NOTAS_ARR DB 15 DUP (0)
      
     CONFIRM_1 DB 13,10,'Ingresado -> ', '$'
     SPC DB ' ', '$'
@@ -240,6 +242,11 @@ ITS_SORT_CAL:
             MOV AX, [NOTA]          ; AX = valor de la nota (DW)
             MOV [DI + 43], AX       ; Guardar en bytes 43-44  Le suma el desplazamiento
             
+            ; Guardar nota en el array de notas
+            MOV BL, K              ; BL = ?ndice del estudiante (0-14)
+            MOV AL, BYTE PTR [NOTA] ; AL = valor de la nota (como byte)
+            MOV NOTAS_ARR[BX], AL  ; Guardar en la posici?n K del array  
+            
             JMP LIMPIAR_NOMBRE_BUF
             
      
@@ -364,6 +371,15 @@ ITS_SORT_CAL:
             LEA DX, BUFFER_PROM
             INT 21h  
             
+            JMP NOTAS_MAX_MIN
+            
+            ;NOTAS MAXIMAS Y MINIMAS
+    
+    NOTAS_MAX_MIN:
+            JMP BUBBLE_SORT
+            
+            
+    BUBBLE_SORT:
             JMP MENU_LOOP
             
             
