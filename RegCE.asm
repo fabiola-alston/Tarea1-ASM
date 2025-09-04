@@ -22,6 +22,7 @@ DATA_SEG    SEGMENT ; Inicia el segmento de datos, para almacenar mensajes estat
     MSG10   DB  10,13,10, "Como desea ordenar las calificaciones:", 0ah,"", 0ah, "1. Orden Ascendente.", 0ah, "2. Orden Descendente.", 0ah, "$"
     MSG11   DB  10,13,10, "LLEGO aqui", 0ah, "$"
     MSG12   DB  10,13,10, "Su estudiante se registr? correctamente", 0ah, "$"
+    MSG13   DB  "0", 0ah, "$"
     PROMPT_NOMBRE DB 13,10,'Ingrese nombre completo: $'
     PROMPT_NOTA DB 13,10,'Nota: $'
     ERROR_NOTA db 10,13,'Error: Ingrese una nota valida (0-100): $'
@@ -29,12 +30,16 @@ DATA_SEG    SEGMENT ; Inicia el segmento de datos, para almacenar mensajes estat
     K DB 0        ;VARIABLE PARA GUARDAR ESTUDIANTES
     CONT_EST DB 0   ;Cuantos estudiantes est?n registrados
     
+    SUMA_NOTAS DW 0  ; VAriable para guardar el total de la suma de todas las notas registradas
+    PROM_NOTAS DB 0  ; variable para guardar el resultado del promedio
+    RESIDUO    DB 0  ;residuo del pro medio
+    BUFFER_PROM DB "00.0$"   ; Formato predefinido
     
     NAME_BUF DB 42,0,42 DUP(0)
     NOTA DW 0 ;NOTA DE ENTERO
     MUL_FAC DB  10
     
-    ESTUDIANTES_R DB 15 DUP(49 DUP(?)) ;Arreglo de todos los estudiantes
+    ESTUDIANTES_R DB 15 DUP(49 DUP(0)) ;Arreglo de todos los estudiantes
      
     CONFIRM_1 DB 13,10,'Ingresado -> ', '$'
     SPC DB ' ', '$'
@@ -261,6 +266,8 @@ ITS_SORT_CAL:
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
             INT 21H            ; llama a la interrupcion 21H de DOS
             
+            JMP PROMEDIO       ; llama a PROMEDIO para conseguir el promedio
+            
             LEA DX, MSG3       ; carga la direcci?n del mensaje 1 en DX
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
             INT 21H            ; llama a la interrupcion 21H de DOS
@@ -286,6 +293,78 @@ ITS_SORT_CAL:
             INT 21H            ; llama a la interrupcion 21H de DOS
             
             JMP MENU_LOOP          ;ESTO POR AHORA QUE NO HAY NADA QUITAR DESPUES
+            
+            ; ///// PROMEIO ////////
+        PROMEDIO: 
+            ;/////// Hacer la suma de todas las notas /////           
+            MOV CL, CONT_EST      ; CL = n?mero de estudiantes
+            MOV CH, 0             ; CH = 0 entonces CX = CONT_EST
+            CMP CX, 0             ; Verificar si hay estudiantes
+            JE PROM_ZERO          ; Si no hay, salta a prom cero
+            LEA DI, ESTUDIANTES_R ; Primer estudiante
+            MOV SUMA_NOTAS, 0
+
+        SUMA:
+            MOV AX, [DI + 43]     ; Leer nota del estudiante actual
+            ADD SUMA_NOTAS, AX    ; Sumar
+            MOV BX, SUMA_NOTAS
+            ADD DI, 49            ; Siguiente estudiante
+            LOOP SUMA
+           
+            
+            MOV AX, SUMA_NOTAS    ; Pasamos a ax el valor de la suma para poder hacer la division
+            MOV BL, CONT_EST      ; Pasamos a bl la cantidad de estudiantes 
+            DIV BL                ; Dividimos SUMA_NOTAS / CONT_EST
+            
+            MOV PROM_NOTAS, AL
+            MOV RESIDUO, AH
+            
+            ; Calcular un decimal: (residuo * 10) / CONT_EST
+            MOV AL, AH            ; AL = residuo
+            MOV AH, 0             ; AX = residuo
+            MOV BL, 10
+            MUL BL                ; AX = residuo * 10
+            MOV BL, CONT_EST      ; Divisor
+            DIV BL                ; AL = decimal (0-9)
+            MOV RESIDUO, AL
+
+            JMP MOSTRAR_PROMEDIO
+            
+        PROM_ZERO:
+            LEA DX, MSG13       ; carga la direcci?n del mensaje 1 en DX
+            MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
+            INT 21H            ; llama a la interrupcion 21H de DOS
+            
+            JMP MENU_LOOP
+            
+        MOSTRAR_PROMEDIO:
+            ; Convertir parte entera a ASCII
+            MOV AL, PROM_NOTAS
+            MOV AH, 0
+            MOV BL, 10
+            DIV BL                ; AL = decenas, AH = unidades
+            
+            ADD AL, '0'
+            MOV [BUFFER_PROM], AL ; Decenas
+            
+            ADD AH, '0'  
+            MOV [BUFFER_PROM+1], AH ; Unidades
+            
+            MOV byte ptr [BUFFER_PROM+2], '.' ; Punto decimal
+            
+            ; Convertir decimal a ASCII
+            MOV AL, RESIDUO
+            ADD AL, '0'
+            MOV [BUFFER_PROM+3], AL ; Decimal
+            
+            MOV byte ptr [BUFFER_PROM+4], '$' ; Terminador
+            
+            ; Mostrar
+            MOV AH, 09h
+            LEA DX, BUFFER_PROM
+            INT 21h  
+            
+            JMP MENU_LOOP
             
             
     
