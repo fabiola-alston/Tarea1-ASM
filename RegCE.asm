@@ -1,14 +1,16 @@
 ; Proyecto en TASM 8086
+
 .MODEL SMALL
 .STACK 100h
 
-DATA_SEG    SEGMENT
-    ; Variables de mensajes
+
+DATA_SEG    SEGMENT ; Inicia el segmento de datos, para almacenar mensajes estaticos y variables relacionadas a las operaciones
+    ;Variables de mensajes
     MENU db 10,13,10, "Digite:", 0ah,"", 0ah, "1. Ingresar calificaciones (15 estudiantes -Nombre Apellido1 Apellido2 Nota-)", 0ah, "2. Mostrar estadisticas.", 0ah, "3. Buscar estudiante por posicion (indice)", 0ah, "4. Ordenar calificaciones (ascendente/descendente).", 0ah, "5. Salir", 0ah, "$"
     WELC_MSG db 0ah, 0dh, "***************  Bienvenido a RegistroCE  ***************", 0ah,"",0ah, "$"
     EXIT_MSG db 0ah, 0dh, "", 0ah,"*************  Gracias por usar RegistroCE  *************",0ah, "$" 
     
-    MSG1    DB  10,13,10,'Digite 1 para ingresar su estudiante o digite 9 para salir al menu principal $' 
+    MSG1    DB  10,13,10,'digite 1 para ingresar a su estudiante o digite 9 para salir al menu principal $' 
     MSG2    DB  10,13,10,'El promedio de notas de los estudiantes ingresados es: $'
     MSG3    DB  13,10,'La nota maxima de los estudiantes ingresados es: $'
     MSG4    DB  13,10,'La nota minima de los estudiantes ingresados es: $'
@@ -18,412 +20,277 @@ DATA_SEG    SEGMENT
     MSG8    DB  13,10,'    Porcentaje(%) $'
     MSG9    DB  10,13,10,'Digite numero de estudiante a mostrar $'
     MSG10   DB  10,13,10, "Como desea ordenar las calificaciones:", 0ah,"", 0ah, "1. Orden Ascendente.", 0ah, "2. Orden Descendente.", 0ah, "$"
-    
-    MSG11    DB  13,10,'    DEBUGGG $'
-    MSG12    DB  13,10,'    DEBUGGG2 $'
-    
-    ; Manejo de estudiantes
-    ESTUDIANTES db 15 dup(20 dup(' '), 20 dup(' '), 20 dup(' '), 0) ; Array de estudiantes
-    CONTADOR_ESTUDIANTES db 0
-    NOTA_BUFFER db 9, 0, 9 dup('$')  ; Buffer para entrada de nota
-    NUMERO db 0
-    
-    ; Mensajes adicionales
-    PROMPT_NOMBRE db 10,13,'Nombre: $'
-    PROMPT_APELLIDO1 db 10,13,'Primer Apellido: $'
-    PROMPT_APELLIDO2 db 10,13,'Segundo Apellido: $'
-    PROMPT_NOTA db 10,13,'Nota (0-100): $'
+    MSG11   DB  10,13,10, "LLEGO aqui", 0ah, "$"
+    MSG12   DB  10,13,10, "Su estudiante se registr? correctamente", 0ah, "$"
+    PROMPT_NOMBRE DB 13,10,'Ingrese nombre completo: $'
+    PROMPT_NOTA DB 13,10,'Nota: $'
     ERROR_NOTA db 10,13,'Error: Ingrese una nota valida (0-100): $'
-    ERROR_ENTRADA_VACIA db 10,13,'Error: No puede dejar espacios vacios. $'
-    MAX_ESTUDIANTES db 10,13,'Maximo de estudiantes alcanzado (15). $'
     
-    ; Buffers para entrada de texto
-    NOMBRE_BUFFER db 21, 0, 21 dup('$')
-    APELLIDO1_BUFFER db 21, 0, 21 dup('$')
-    APELLIDO2_BUFFER db 21, 0, 21 dup('$')
+    K DB 0        ;VARIABLE PARA GUARDAR ESTUDIANTES
+    CONT_EST DB 0   ;Cuantos estudiantes est?n registrados
+    
+    
+    NAME_BUF DB 42,0,42 DUP(0)
+    NOTA DW 0 ;NOTA DE ENTERO
+    MUL_FAC DB  10
+    
+    ESTUDIANTES_R DB 15 DUP(49 DUP(?)) ;Arreglo de todos los estudiantes
+     
+    CONFIRM_1 DB 13,10,'Ingresado -> ', '$'
+    SPC DB ' ', '$'
+    BLANK_SPACE DB ''
+    LABEL_NOTA DB 13,10,'Nota: ', '$'
+    CRLF DB 13,10,'$'
+    
+ 
     
 DATA_SEG    ENDS
 
 CODE_SEG    SEGMENT
-    ASSUME CS: CODE_SEG, DS:DATA_SEG
-    
-    START:
-        MOV AX, DATA_SEG
-        MOV DS, AX
+   ASSUME CS: CODE_SEG, DS:DATA_SEG
+    START:  MOV     AX, DATA_SEG
+            MOV     DS, AX
 
     INITIAL_MSG:
-        MOV AH, 09
-        MOV DX, OFFSET WELC_MSG 
-        INT 21H
-                
+            MOV     AH, 09
+            MOV     DX, OFFSET WELC_MSG 
+            INT     21H
+            
     MENU_LOOP:
-        LEA DX, MENU       ; carga la direcci?n del mensaje MENU en DX
-        MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
-        INT 21H            ; llama a la interrupcion 21H de DOS
+            LEA DX, MENU       ; carga la direcci?n del mensaje MENU en DX
+            MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
+            INT 21H            ; llama a la interrupcion 21H de DOS
 
-        MOV AH, 01H        ; lee un caracter del teclado
-        INT 21H            ; llama a la interrupcion 21H de DOS
+            MOV AH, 01H        ; lee un caracter del teclado
+            INT 21H            ; llama a la interrupcion 21H de DOS
 
-        SUB AL, 30H        ; convierte el caracter ingresado por el usuario ASCII a su equivalente num?rico
+            SUB AL, 30H        ; convierte el caracter ingresado por el usuario ASCII a su equivalente num?rico
             
-        CMP AL, 1          ; compara el valor ingresado con 1
-        JE INGRSCAL    ; salta a INGRESAR_NOTA si es igual a 1
-        CMP AL, 2          ; compara el valor ingresado con 2
-        JE LL_ESTADISTICAS   ; salta a LL_ESTADISTICAS si es igual a 2
-        CMP AL, 3          ; compara el valor ingresado con 3
-        JE LL_INDICES  ; salta a LL_INDICES si es igual a 3
-        CMP AL, 4          ; compara el valor ingresado con 4
-        JE LL_ORD_NOTAS    ; salta a LL_ORD_NOTAS si es igual a 4
-        CMP AL, 5          ; compara el valor ingresado con 5
-        JMP EXIT_PROGRAM   ; salta a EXIT_PROGRAM si es igual a 5
+            CMP AL, 1          ; compara el valor ingresado con 1
+            JE ITS_ENTER_GRADES    ; salta a ENTER_GRADES si es igual a 1
+            CMP AL, 2          ; compara el valor ingresado con 2
+            JE ITS_STATISTICS   ; salta a ITS_STATISTICS si es igual a 2
+            CMP AL, 3          ; compara el valor ingresado con 3
+            JE ITS_INDEX_SEARCH  ; salta a ITS_INDEX_SEARCH si es igual a 3
+            CMP AL, 4          ; compara el valor ingresado con 4
+            JE ITS_SORT_CAL    ; salta a ITS_SORT_CAL si es igual a 4
+            CMP AL, 5          ; compara el valor ingresado con 5
+            JMP EXIT_PROGRAM   ; salta a EXIT_PROGRAM si es igual a 5
     
-INGRSCAL:
-    JMP INGRESAR_NOTA
-LL_ESTADISTICAS:
-    JMP ESTADISTICAS
-LL_INDICES:
-    JMP BUSCAR_INDICE
-LL_ORD_NOTAS:
-    JMP ORDENAR_NOTAS
-
-;//////////////////////////////////////////////////////////////// REGISTAR CALIFICACION ////////////////////////////////////////////////////////////     
-    MAXIMO_ALCANZADO:
-        LEA DX, MAX_ESTUDIANTES
-        MOV AH, 09H
-        INT 21H
-        JMP MENU_LOOP
-
-    INGRESAR_NOTA:
-        ; Verificar si ya hay 15 estudiantes
-        MOV AL, CONTADOR_ESTUDIANTES ;Trae al registro AL el valor de contador estudiantes
-        CMP AL, 15 ;Se compara si es numero de estudiantes guardados es igual al maximo
-        JAE MAXIMO_ALCANZADO ;Si se cumple, salta a MAXIMO_ALCANZADO
-        
-        LEA DX, MSG1       ; carga la direcci?n del mensaje 1 en DX
-        MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
-        INT 21H            ; llama a la interrupcion 21H de DOS
+    ;Para evitar el excedente de bytes
+ITS_ENTER_GRADES:
+    JMP ENTER_GRADES       ; salta a ingresar calificaciones
+ITS_STATISTICS:
+    JMP STATISTICS      ; salta a estadisticas
+ITS_INDEX_SEARCH:
+    JMP INDEX_SEARCH     ; salta a buscar por indice
+ITS_SORT_CAL:
+    JMP SORT_CAL       ; salta a ordnar calificaciones
+    
             
-        MOV AH, 01H        ; lee un caracter del teclado
-        INT 21H            ; llama a la interrupcion 21H de DOS
-        SUB AL, 30H        ; convierte el caracter ingresado por el usuario ASCII a su equivalente num?rico
+    ;//////////////////////////////////////////////////////////////// INGRESAR CALIFICACION ////////////////////////////////////////////////////////////           
+    ENTER_GRADES:
+            LEA DX, MSG1       ; carga la direcci?n del mensaje 1 en DX
+            MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
+            INT 21H            ; llama a la interrupcion 21H de DOS
+                
+            MOV AH, 01H        ; lee un caracter del teclado
+            INT 21H            ; llama a la interrupcion 21H de DOS
+            SUB AL, 30H        ; convierte el caracter ingresado por el usuario ASCII a su equivalente num?rico
+                
+            CMP AL, 1          ; compara el valor ingresado con 1
+            JE REGISTRO    ; salta a REGISTER si es igual a 1
+            CMP AL, 9          ; compara el valor ingresado con 2
+            JE MENU_LOOP   ; salta al menu si es 9     
+    
+    REGISTRO:     
+         ; ===== Nombre =====
+            LEA DX, PROMPT_NOMBRE
+            MOV AH, 09h
+            INT 21h
             
-        CMP AL, 1          ; compara el valor ingresado con 1
-        JE REGISTRO    ; salta a REGISTER si es igual a 1
-        CMP AL, 9          ; compara el valor ingresado con 2
-        JE MENU_LOOP   ; salta al menu si es 9        
+            LEA DX, NAME_BUF
+            MOV AH, 0Ah ; leer cadena (buffer estilo 0Ah)
+            INT 21h
+            
+            ; [ADDED] ? Eco de lo ingresado (convierte buffers 0Ah a '$' y los imprime)
+            LEA DX, CONFIRM_1
+            MOV AH, 09h
+            INT 21h
+            
+            ; Imprime: Nombre Apellido1 Apellido2
+            LEA DX, NAME_BUF
+            CALL PrintInputBuffer
+            LEA DX, SPC
+            MOV AH, 09h
+            INT 21h
+            
+            JMP ESCRIBIR_NOTA
+            
+    ESCRIBIR_NOTA:
+            
+            ; ===== Nota (texto) =====
+            LEA DX, PROMPT_NOTA
+            MOV AH, 09h
+            INT 21h
+            
+            MOV NOTA, 0                 ; Hacer la nota 0
+            
+            JMP LEER_NOTA
         
-    REGISTRO:    ; Pedir nombre 
-        LEA DX, PROMPT_NOMBRE
-        MOV AH, 09H
-        INT 21H
-        CALL LEER_TEXTO
-        JC INGRESAR_NOTA  ; Si hay error, volver a empezar
-        
-        ; Copiar nombre a buffer temporal
-        MOV SI, OFFSET NOMBRE_BUFFER + 2
-        MOV DI, OFFSET NOMBRE_BUFFER
-        CALL COPIAR_TEXTO_TEMPORAL
-        
-        ; Pedir primer apellido
-        LEA DX, PROMPT_APELLIDO1
-        MOV AH, 09H
-        INT 21H
-        CALL LEER_TEXTO
-        JC INGRESAR_NOTA
-        
-        ; Copiar primer apellido a buffer temporal
-        MOV SI, OFFSET APELLIDO1_BUFFER + 2
-        MOV DI, OFFSET APELLIDO1_BUFFER
-        CALL COPIAR_TEXTO_TEMPORAL
-        
-        ; Pedir segundo apellido
-        LEA DX, PROMPT_APELLIDO2
-        MOV AH, 09H
-        INT 21H
-        CALL LEER_TEXTO
-        JC INGRESAR_NOTA
-        
-        ; Copiar segundo apellido a buffer temporal
-        MOV SI, OFFSET APELLIDO2_BUFFER + 2
-        MOV DI, OFFSET APELLIDO2_BUFFER
-        CALL COPIAR_TEXTO_TEMPORAL
-        
-        JMP PEDIR_NOTA
-        
-        ; Pedir y validar nota
-    PEDIR_NOTA:
-        LEA DX, PROMPT_NOTA
-        MOV AH, 09H
-        INT 21H
-        
-        CALL LEER_NOTA
-        LEA DX, MSG12       ; carga la direcci?n del mensaje MENU en DX
-        MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
-        INT 21H            ; llama a la interrupcion 21H de DOS
-        JNC NOTA_VALIDA
-        
-        LEA DX, ERROR_NOTA
-        MOV AH, 09H
-        INT 21H
-        
-        JMP PEDIR_NOTA
-       
+        LEER_NOTA:    
+            
+            MOV     AH, 01h              ; Funci?n para leer un car?cter del teclado
+            INT     21h                  ; Llama a la interrupci?n 21H de DOS para leer el car?cter
+            CMP     AL, 13               ; Verifica si es el car?cter de retorno (ASCII 13)
+            JZ      VALIDAR_NOTA           ; Si es retorno, salta a SECOND_MSG
+            CMP     AL, '0'              ; Compara con el car?cter '0'
+            JL      NOTA_INVALIDA  ; Salta a INVALID_INPUT si es menor que '0'
+            CMP     AL, '9'              ; Compara con el car?cter '9'
+            JG      NOTA_INVALIDA  ; Salta a INVALID_INPUT si es mayor que '9'
 
-    NOTA_VALIDA:
-        LEA DX, MSG11       ; carga la direcci?n del mensaje MENU en DX
-        MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
-        INT 21H            ; llama a la interrupcion 21H de DOS
-        
-        CALL GUARDAR_ESTUDIANTE ; Guardar estudiante en el array
-        
-        LEA DX, MSG12       ; carga la direcci?n del mensaje MENU en DX
-        MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
-        INT 21H            ; llama a la interrupcion 21H de DOS
-       
-        INC CONTADOR_ESTUDIANTES ; Incrementar contador
-        
-        JMP LIMP_PANTALLA
-        
-    LIMP_PANTALLA:
- 
-        ; Borrar la pantalla
-        MOV AH, 06h    ; Funcion 06h borrar pantalla
-        MOV AL, 0      ; Valor a escribir en la pantalla, 0 para borrar
-        MOV BH, 07h    ; Pagina de visualizacion, 07h para la pagina predeterminada
-        MOV CX, 0      ; Col/Row desde donde borrar: 0
-        MOV DX, 184Fh  ; Col/Row hasta donde borrar, 184Fh para borrar toda la pantalla
-        INT 10h        ; interrupcion de video BIOS
-        
-        ; Mover el puntero a la parte superior izquierda de la pantalla
-        MOV AH, 02h    ; Funcion 02h, establece la posicion del cursor
-        MOV BH, 0      ; Pagina de visualizacion, 0 para la pagina predeterminada
-        MOV DH, 0      ; Fila establecida en 0
-        MOV DL, 0      ; Columna establecida en 0
-        INT 10h        ; interrupcion de video BIOS
-        
-        MOV SP, 100h    ; resetea el puntero de pila al inicio
-        
-        JMP INGRESAR_NOTA            ; Retornar al bucle de ingresar nota   
+            ; Convertir y acumular
+            SUB AL, 48         ; ASCII a n?mero
+            MOV BL, AL
+            MOV BH, 0          ; BX = nuevo d?gito
+            
+            MOV AX, [NOTA]     ; Cargar el VALOR de NOTA
+            MUL MUL_FAC        ; AX = NOTA_actual * 10
+            ADD AX, BX         ; AX = (NOTA_actual * 10) + nuevo_d?gito
+            MOV [NOTA], AX     ; Guardar el nuevo valor
+            JMP LEER_NOTA      ;Para seguir leyendo digitos
+            
+      NOTA_INVALIDA:
+            LEA DX, ERROR_NOTA
+            MOV AH, 09h
+            INT 21h
+            
+            JMP ESCRIBIR_NOTA
+     
+      VALIDAR_NOTA:
+            CMP     NOTA, 100
+            JA      NOTA_INVALIDA
+            CMP     NOTA, 0
+            JL      NOTA_INVALIDA
+            
+            JMP GUARDAR_DATOS
 
-    ; Rutina para leer texto y validar que no est? vac?o
-    LEER_TEXTO PROC
-        MOV DX, OFFSET NOMBRE_BUFFER
-        MOV AH, 0Ah
-        INT 21h
-        
-        ; Verificar que no est? vac?o
-        MOV SI, OFFSET NOMBRE_BUFFER + 1
-        MOV CL, [SI]
-        CMP CL, 0
-        JNE TEXTO_VALIDO
-        
-        ; Mostrar error si est? vac?o
-        LEA DX, ERROR_ENTRADA_VACIA
-        MOV AH, 09H
-        INT 21H
-        STC  ; Establecer carry flag para indicar error
-        RET
+      
+      GUARDAR_DATOS:
+            
+            INC CONT_EST ; Incrementar contador de cuantos estudiantes se han guardado
+            
+            ; K = CONT_EST -1
+            MOV AL, CONT_EST ;Movemos a AL el valor del contador
+            SUB AL, 1        ;Le restamos 1
+            MOV K, AL        ;Guardamos este valor en K
+            
+            ; EStructura: [(indice de estudiante, nombre estudiante, nota), (indice de estudiante, nombre estudiante, nota),]
+            
+            ; //////// Guardar CONT_EST en el primer byte de cada estudiante, ya que es su indice ///////
+            ; Calcular posici?n en el array: DI = ESTUDIANTES_R + (49 * K)
+            MOV AX, 49            ; Bytes por estudiante
+            MOV BL, K             ; ?ndice del estudiante
+            MUL BL                ; AX = 49 * K
+            LEA DI, ESTUDIANTES_R ; DI apunta al inicio del array
+            ADD DI, AX            ; DI apunta al estudiante K
+            
+            ; Guardar ?ndice en el PRIMER byte del estudiante
+            MOV AL, BYTE PTR CONT_EST    ; AL = ?ndice (1-15)
+            MOV [DI], AL          ; Va a la direccion que tiene guardada DI y guardar el primer byte (posici?n 1)
+            
+            
+            ; //////// Guardar el buffer con el nombre que es de tama?o 42, pero empezaria en el byte 1
+            ;calculo seria: (49*K) + 1
+            ADD DI, 1            ;Sumamos 1 para que apunte al nombre del estudiante K
+            LEA SI, NAME_BUF + 2 ; Saltar bytes de control del buffer
+            MOV CL, NAME_BUF + 1 ; N?mero de caracteres le?dos
+            MOV CH, 0
+            
+            CMP CX, 0           ; Verificar si hay caracteres
+            JE FIN_NOMBRE       ; Si no hay nombre, saltar
+            
+        COPIAR_NOMBRE:
+            MOV AL, [SI]
+            MOV [DI], AL
+            INC SI
+            INC DI
+            LOOP COPIAR_NOMBRE
 
-    TEXTO_VALIDO:
-        CLC  ; Limpiar carry flag para indicar ?xito
-        RET
-    LEER_TEXTO ENDP
-
-    ; Rutina para copiar texto a buffer temporal
-    COPIAR_TEXTO_TEMPORAL PROC
-        MOV CX, 20
-    COPIAR_LOOP:
-        MOV AL, [SI]
-        MOV [DI], AL
-        INC SI
-        INC DI
-        LOOP COPIAR_LOOP
-        RET
-    COPIAR_TEXTO_TEMPORAL ENDP
-
-    ; Rutina para leer y validar nota
-    LEER_NOTA PROC
-        MOV DX, OFFSET NOTA_BUFFER
-        MOV AH, 0Ah
-        INT 21h
-        
-        ; Convertir ASCII a n?mero
-        MOV SI, OFFSET NOTA_BUFFER + 2
-        XOR AX, AX
-        XOR CX, CX
-        MOV BX, 10
-
-    CONVERTIR_LOOP:
-        MOV CL, [SI]
-        CMP CL, 0Dh
-        JE FIN_CONVERSION
-        CMP CL, '0'
-        JL ERROR_CONVERSION
-        CMP CL, '9'
-        JG ERROR_CONVERSION
-        
-        SUB CL, '0'
-        MUL BX
-        JC ERROR_CONVERSION
-        ADD AL, CL
-        ADC AH, 0
-        JC ERROR_CONVERSION
-        
-        INC SI
-        JMP CONVERTIR_LOOP
-
-    FIN_CONVERSION:
-        CMP AX, 0
-        JL ERROR_CONVERSION
-        CMP AX, 100
-        JG ERROR_CONVERSION
-        
-        MOV [NUMERO], AL
-        CLC
-        RET
-
-    ERROR_CONVERSION:
-        STC
-        RET
-    LEER_NOTA ENDP
-
-    ; Rutina para guardar estudiante en el array
-    GUARDAR_ESTUDIANTE PROC
-        ; Calcular posici?n en el array
-        MOV AL, CONTADOR_ESTUDIANTES
-        MOV BL, 61  ; 20 (nombre) + 20 (apellido1) + 20 (apellido2) + 1 (nota) = 61 bytes por estudiante
-        MUL BL
-        LEA SI, ESTUDIANTES
-        ADD SI, AX
-        
-        ; Copiar nombre
-        MOV DI, SI
-        MOV CX, 20
-        LEA SI, NOMBRE_BUFFER
-    REP MOVSB
-        
-        ; Copiar primer apellido
-        MOV CX, 20
-        LEA SI, APELLIDO1_BUFFER
-    REP MOVSB
-        
-        ; Copiar segundo apellido
-        MOV CX, 20
-        LEA SI, APELLIDO2_BUFFER
-    REP MOVSB
-        
-        ; Copiar nota
-        MOV AL, [NUMERO]
-        MOV [DI], AL          ; Guardar la nota en la posici?n actual de DI
-        
-        RET
-    GUARDAR_ESTUDIANTE ENDP
-
+        FIN_NOMBRE:
+            ; DI ahora apunta despu?s del ?ltimo car?cter copiado
+            ; Puedes agregar un terminador si lo necesitas
+            MOV byte ptr [DI], '$'
+            
+            
+            ;/////// Guardar la nota, que es NOTA, este seria en el byte 43
+            ;calculo seria: (49*K) + 43
+            ; Calcular posici?n en el array: DI = ESTUDIANTES_R + (49 * K)
+            MOV AX, 49            ; Bytes por estudiante
+            MOV BL, K             ; ?ndice del estudiante
+            MUL BL                ; AX = 49 * K
+            LEA DI, ESTUDIANTES_R ; DI apunta al inicio del array
+            ADD DI, AX            ; DI apunta a la nota del estudiante K
+            
+            MOV AX, [NOTA]          ; AX = valor de la nota (DW)
+            MOV [DI + 43], AX       ; Guardar en bytes 43-44  Le suma el desplazamiento
+            
+            JMP LIMPIAR_NOMBRE_BUF
+            
+     
+        LIMPIAR_NOMBRE_BUF:
+            LEA DI, NAME_BUF    ; DI apunta al buffer
+            MOV byte ptr [DI], 42    ; Tama?o m?ximo (42)
+            MOV byte ptr [DI+1], 0   ; Caracteres usados (0)
+            ADD DI, 2           ; Apuntar al ?rea de datos
+            
+            ; Limpiar los 42 bytes de datos (llenar con 0's)
+            MOV CX, 42          ; 42 bytes a limpiar
+            MOV AL, 0           ; Valor para limpiar (0)
+            REP STOSB           ; Llenar con ceros
+            
+            LEA DX, MSG12       ; carga la direcci?n del mensaje 1 en DX
+            MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
+            INT 21H            ; llama a la interrupcion 21H de DOS
+            
+            JMP ENTER_GRADES
+            
 ;//////////////////////////////////////////////////////////////// MOSTRAR ESTADISTICAS ////////////////////////////////////////////////////////////////    
-    ESTADISTICAS:
-            LEA DX, MSG2       ; carga la direcci?n del mensaje 2:promedio en DX
+    STATISTICS:
+            LEA DX, MSG2       ; carga la direcci?n del mensaje 1 en DX
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
             INT 21H            ; llama a la interrupcion 21H de DOS
             
-            CALL PROMEDIO
-            
-            ; Mostrar parte entera
-            ;MOV BL, AL       ; Guardar promedio
-            ;MOV AL, BL
-            ;CALL MOSTRAR_NUMERO  ; Procedimiento que mostr? antes
-
-            ; Mostrar parte decimal
-            ;MOV DL, '.'
-            ;MOV AH, 02h
-            ;INT 21h
-
-            ;MOV AL, AH       ; Residuo
-            ;MOV BL, 10
-            ;MUL BL           ; AX = residuo * 10
-            ;MOV BL, CONTADOR_ESTUDIANTES
-            ;DIV BL           ; AL = d?cimas (0-9)
-            ;ADD AL, '0'
-            ;MOV DL, AL
-            ;MOV AH, 02h
-            ;INT 21h
-            
-            LEA DX, MSG3       ; carga la direcci?n del mensaje 3: nota max en DX
+            LEA DX, MSG3       ; carga la direcci?n del mensaje 1 en DX
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
             INT 21H            ; llama a la interrupcion 21H de DOS
             
-            CALL NOTAMAX
-            
-            LEA DX, MSG4       ; carga la direcci?n del mensaje 4: nota min en DX
+            LEA DX, MSG4       ; carga la direcci?n del mensaje 1 en DX
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
             INT 21H            ; llama a la interrupcion 21H de DOS
             
-            LEA DX, MSG5       ; carga la direcci?n del mensaje 5: aprobados en DX
+            LEA DX, MSG5       ; carga la direcci?n del mensaje 1 en DX
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
             INT 21H            ; llama a la interrupcion 21H de DOS
             
-            LEA DX, MSG6       ; carga la direcci?n del mensaje 6: % en DX
+            LEA DX, MSG6       ; carga la direcci?n del mensaje 1 en DX
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
             INT 21H            ; llama a la interrupcion 21H de DOS
             
-            LEA DX, MSG7       ; carga la direcci?n del mensaje 7: reprobados en DX
+            LEA DX, MSG7       ; carga la direcci?n del mensaje 1 en DX
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
             INT 21H            ; llama a la interrupcion 21H de DOS
             
-            LEA DX, MSG8       ; carga la direcci?n del mensaje 8: % en DX
+            LEA DX, MSG8       ; carga la direcci?n del mensaje 1 en DX
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
             INT 21H            ; llama a la interrupcion 21H de DOS
             
             JMP MENU_LOOP          ;ESTO POR AHORA QUE NO HAY NADA QUITAR DESPUES
-    
-    ;//////////// SUBRUTINA PARA CALCULAR EL PROMEDIO ////////////////////
-
-    PROMEDIO PROC
             
-           MOV CX, 15                  ; 15 estudiantes
-           LEA SI, ESTUDIANTES         ; SI apunta al inicio del array
-           ADD SI, 60                  ; Posicionar SI en la PRIMERA nota (byte 60)
-           XOR AX, AX                  ; AX = 0 (acumulador de la suma)
-
-        SUMA_NOTAS:
-           MOV BL, [SI]                ; Leer la nota actual (1 byte)
-           XOR BH, BH                  ; Limpiar BH para extender BL a 16 bits
-           ADD AX, BX                  ; Sumar nota al acumulador
-                
-           ADD SI, 61                  ; Avanzar al siguiente estudiante (61 bytes)
-           LOOP SUMA_NOTAS             ; Repetir para los 15 estudiantes
-           
-           MOV BL, CONTADOR_ESTUDIANTES  ; Numero de estudiantes registrados
-           XOR AH, AH                    ; Pone el ah en 0
-           DIV BL                        ; AL = AX / estudiantes registrados (promedio)
-           
-           LEA DX, MSG11       ; carga la direcci?n del mensaje 3: nota max en DX
-           MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
-           INT 21H            ; llama a la interrupcion 21H de DOS
-    
-            RET
-    PROMEDIO ENDP
-    
-    ;//////////// SUBRUTINA PARA MOSTRAR EL NUMERO ////////////////////
-    
-    
-    
-    
-    
-    ;//////////// SUBRUTINA PARA LA NOTA MAXIMA ////////////////////
-    NOTAMAX PROC
-            
-            LEA DX, MSG6       ; carga la direcci?n del mensaje 6: % en DX
-            MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
-            INT 21H            ; llama a la interrupcion 21H de DOS
-    
-    
-    
-            RET
-    NOTAMAX ENDP
             
     
 ;//////////////////////////////////////////////////////////////// BUSCAR ESTUDIANTE POR POSICION //////////////////////////////////////////////////////   
-    BUSCAR_INDICE:
+    INDEX_SEARCH:
             LEA DX, MSG9       ; carga la direcci?n del mensaje 1 en DX
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
             INT 21H            ; llama a la interrupcion 21H de DOS
@@ -431,7 +298,7 @@ LL_ORD_NOTAS:
             JMP MENU_LOOP          ;ESTO POR AHORA QUE NO HAY NADA QUITAR DESPUES
     
 ;//////////////////////////////////////////////////////////////// ORDENAR CALIFICACIONES //////////////////////////////////////////////////////////////  
-    ORDENAR_NOTAS:
+    SORT_CAL:
             LEA DX, MSG10       ; carga la direcci?n del mensaje 1 en DX
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
             INT 21H            ; llama a la interrupcion 21H de DOS
@@ -441,14 +308,63 @@ LL_ORD_NOTAS:
             SUB AL, 30h ; a valor num?rico 1/2
             
             JMP MENU_LOOP          ;ESTO POR AHORA QUE NO HAY NADA QUITAR DESPUES
-        
+            
+            
+;////////////////////////////////////////////////////////////////       SUBRUTINAS DE SOPORTE //////////////////////////////////////////////////////////
+
+
+      
+
+; Convierte un buffer le?do con INT 21h/0Ah a cadena '$' y lo imprime con AH=09h.
+; Entrada: DX = direcci?n del buffer (est?ndar 0Ah: [max][len][data..][0Dh])
+      PrintInputBuffer PROC
+            PUSH AX
+            PUSH BX
+            PUSH CX
+            PUSH DX
+            PUSH SI
+            PUSH DI
+
+
+            MOV BX, DX ; BX = base del buffer
+            MOV AL, [BX+1] ; AL = longitud real digitada
+            XOR AH, AH
+            MOV CX, AX ; CX = longitud
+
+
+            LEA SI, [BX+2] ; SI = inicio de los datos
+            MOV DI, SI
+            ADD DI, CX ; DI = posici?n despu?s del ?ltimo car?cter
+
+
+            MOV BYTE PTR [DI], '$' ; sobrescribe el 0Dh con '$'
+
+
+            MOV DX, SI ; DX -> datos ya terminados con '$'
+            MOV AH, 09h
+            INT 21h
+
+
+            POP DI
+            POP SI
+            POP DX
+            POP CX
+            POP BX
+            POP AX
+            RET
+      PrintInputBuffer ENDP       
+
+
+;////////////////////////////////////////////////////////////////       SALIR       ///////////////////////////////////////////////////////////////////
     EXIT_PROGRAM:
-        LEA DX, EXIT_MSG
-        MOV AH, 09h
-        INT 21h
-        MOV AH, 4CH
-        MOV AL, 0
-        INT 21H
+            ; Muestra el mensaje de salida
+            LEA     DX, EXIT_MSG   ; Carga la direcci?n del mensaje de salida en DX
+            MOV     AH, 09h        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
+            INT     21h            ; Llama a la interrupci?n 21H de DOS para imprimir el mensaje en pantalla
+            
+            MOV     AH, 4CH
+            MOV     AL, 0
+            INT     21H
 
 CODE_SEG    ENDS
     END START
