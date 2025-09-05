@@ -651,7 +651,58 @@ ITS_SORT_CAL:
             INT 21h ; AL = '1' o '2'
             SUB AL, 30h ; a valor num?rico 1/2
             
+            ; por ahora solo mostrar nombres 
+            CALL MOSTRAR_NOMBRES_ESTUDIANTES
+            
             JMP MENU_LOOP          ;ESTO POR AHORA QUE NO HAY NADA QUITAR DESPUES
+            
+            
+            
+;////////////////////////////////////////////////////////////////       SUBRUTINAS DE MOSTRAR NOMBRES //////////////////////////////////////////////////////////
+
+    MOSTRAR_NOMBRES_ESTUDIANTES PROC
+            PUSH AX
+            PUSH BX
+            PUSH CX
+            PUSH DX
+            PUSH SI
+            PUSH DI
+            
+            MOV CL, CONT_EST ; cantidad de estudiantes
+            MOV CH, 0
+            CMP CX, 0
+            JE FIN_MOSTRAR_NOMBRES ; si no hay estudiantes salir 
+            
+            LEA DI, ESTUDIANTES_R ; apuntar al inicio de la lista 
+            
+            
+    SIGUIENTE_ESTUDIANTE: 
+            ADD DI, 1  ; saltar el byte del indice 
+            MOV DX, DI ; DX -> nombre
+            MOV AH, 09h
+            INT 21h     ; mostrar el nombre
+            
+            
+            ;Salto de linea entre nombres 
+            LEA DX, CRLF
+            MOV AH, 09h
+            INT 21h
+            
+            
+            ADD DI, 42  ; pasar al siguiente estudiante (43 bytes en total)
+            LOOP SIGUIENTE_ESTUDIANTE
+            
+        FIN_MOSTRAR_NOMBRES:
+            POP DI
+            POP SI
+            POP DX
+            POP CX
+            POP BX
+            POP AX
+            RET
+            
+    MOSTRAR_NOMBRES_ESTUDIANTES ENDP
+            
             
             
 ;////////////////////////////////////////////////////////////////       SUBRUTINAS DE SOPORTE //////////////////////////////////////////////////////////
