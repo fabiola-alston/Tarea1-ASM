@@ -12,7 +12,7 @@ DATA_SEG    SEGMENT ; Inicia el segmento de datos, para almacenar mensajes estat
     EXIT_MSG db 0ah, 0dh, "", 0ah,"*************  Gracias por usar RegistroCE  *************",0ah, "$" 
     
     MSG1    DB  10,13,10,'digite 1 para ingresar a su estudiante o digite 9 para salir al menu principal $' 
-    MSG2    DB  10,13,10,'El promedio de notas de los estudiantes ingresados es: $'
+    MSG2    DB  10,13,10,'El promedio de notas de los estudiantes in promedio es: $'
     MSG3    DB  13,10,'La nota maxima es: $'
     MSG4    DB  13,10,'La nota minima: $'
     MSG5    DB  13,10,'La cantidad de estudiantes aprobados es: $'
@@ -39,8 +39,8 @@ DATA_SEG    SEGMENT ; Inicia el segmento de datos, para almacenar mensajes estat
     NAME_BUF DB 42,0,42 DUP(0)
     NOTA DW 0 ;NOTA DE ENTERO
     MUL_FAC DB  10
-    NOTA_MAX  DB 0
-    NOTA_MIN  DB 0
+    APROBADOS  DB 0
+    PRC_AP     DW 0      ;
     
     ESTUDIANTES_R DB 15 DUP(43 DUP(0)) ;Arreglo de todos los estudiantes, sin nota
     NOTAS_ARR DB 15 DUP (2 DUP(0)); Arreglo de las notas de los estudiantes
@@ -50,7 +50,7 @@ DATA_SEG    SEGMENT ; Inicia el segmento de datos, para almacenar mensajes estat
     BLANK_SPACE DB ''
     LABEL_NOTA DB 13,10,'Nota: ', '$'
     CRLF DB 13,10,'$'
-    
+    PRCT DB ' %', '$'     ;simbolo de porcentaje
  
     
 DATA_SEG    ENDS
@@ -379,7 +379,6 @@ ITS_SORT_CAL:
             JMP NOTAS_MAX_MIN
             
             ;NOTAS MAXIMAS Y MINIMAS
-    
     NOTAS_MAX_MIN:
             LEA DX, MSG3       ; carga la direcci?n del mensaje 3 en DX
             MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
@@ -405,11 +404,130 @@ ITS_SORT_CAL:
             MUL BX                 ; AX = 2 * ?ltimo_?ndice
             MOV BX, AX             ; BX = offset del ?ltimo elemento
             
-            MOV AL, [DI + BX + 1]  ; ? Nota del ?ltimo elemento
+            MOV AL, [DI + BX + 1]  ;  Nota del ?ltimo elemento
             ;MOV NOTA_MIN, AL
             CALL MOSTRAR_NUM
             
+            JMP ESTS_APROBADOS
+     
+    ESTS_APROBADOS:
+           ;/////// Hacer la comparacion de nota >= 70 /////           
+            MOV CL, CONT_EST      ; CL = n?mero de estudiantes
+            MOV CH, 0             ; CH = 0 entonces CX = CONT_EST
+            LEA DI, NOTAS_ARR     ; Primer nota del estudiante
+            MOV APROBADOS, 0
+            MOV BL, 0
+
+        COMPARACION:
+            MOV AL, [DI + 1]     ; Leer nota del estudiante actual
+            CMP AL, 70
+            JB  APR_REP          ;Como el array esta ordenado, a la hora de verificar una nota <70, podemos sacar todos los calculos
+            INC APROBADOS
+            ADD DI, 2            ; Siguiente estudiante
+            LOOP COMPARACION  
+     
+        APR_REP: 
+            LEA DX, MSG5       ; carga la direcci?n del mensaje 5 en DX
+            MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
+            INT 21H            ; llama a la interrupcion 21H de DOS 
+          
+            MOV AL, APROBADOS  ;Mover APROBADOS a AL para usarlo en MOSTRAR_NUM
+            CALL MOSTRAR_NUM
+            
+            MOV AL, APROBADOS
+            CALL CALCULAR_PORCENTAJE
+            
+            LEA DX, MSG6       ; carga la direcci?n del mensaje 6 en DX
+            MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
+            INT 21H            ; llama a la interrupcion 21H de DOS 
+            
+            CALL MOSTRAR_PORCENTAJE
+            
+            ;CARGA ESTUDIANTES REPROBADOS
+            LEA DX, MSG7       ; carga la direcci?n del mensaje 7 en DX
+            MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
+            INT 21H            ; llama a la interrupcion 21H de DOS 
+            
+            MOV AL, CONT_EST   ; Movemos a AL la cantidad totales de estudiantes
+            SUB AL, APROBADOS  ; HACEMOS REP = CONT_EST - APROBADOS
+            CALL MOSTRAR_NUM
+            
+            LEA DX, MSG8       ; carga la direcci?n del mensaje 8 en DX
+            MOV AH, 09H        ; prepara AH para la funci?n de servicio de DOS para imprimir una cadena de caracteres
+            INT 21H            ; llama a la interrupcion 21H de DOS 
+            
+            MOV BX, 1000       ;Movemos 1000 a BX
+            SUB BX, PRC_AP     ; Hacemos BX = 1000 - PRC_AP
+            MOV PRC_AP, BX     ; Este valor seria el de los reprobados
+            
+            CALL MOSTRAR_PORCENTAJE   ;Lo mostramos en pantalla
+            
+            
             JMP MENU_LOOP
+            
+    
+    ; CALCULAR EL PORCENTAJE
+    CALCULAR_PORCENTAJE PROC
+            PUSH AX
+            PUSH BX
+            PUSH DX
+            
+            MOV AH, 0              ; AX = APROBADOS
+            MOV BX, 1000           ; 1000 para un decimal
+            MUL BX                 ; DX:AX = APROBADOS * 1000
+            
+            ; Dividir por CONT_EST
+            MOV BL, CONT_EST
+            MOV BH, 0              ; BX = CONT_EST
+            DIV BX                 ; AX = resultado, DX = residuo
+            
+            MOV PRC_AP, AX ; Guardar porcentaje * 10
+         
+            POP DX
+            POP BX
+            POP AX
+            RET
+    CALCULAR_PORCENTAJE ENDP        
+    
+    
+    MOSTRAR_PORCENTAJE PROC
+            PUSH AX
+            PUSH BX
+            PUSH DX
+            
+            MOV AX, PRC_AP  ; AX = 666 (66.6%)
+            
+            ; Separar parte entera y decimal
+            MOV BL, 10
+            DIV BL                  ; AL = 66 (parte entera), AH = 6 (decimal)
+            
+            ; Mostrar parte entera
+            PUSH AX                 ; Guardar AX (AH tiene el decimal)
+            MOV AH, 0              ; AL = parte entera
+            CALL MOSTRAR_NUM       ; Mostrar esa parte entera
+            
+            ; Mostrar punto decimal
+            MOV DL, '.'
+            MOV AH, 02h
+            INT 21h
+            
+            ; Mostrar parte decimal
+            POP AX                 ; Recuperar AX
+            MOV AL, AH             ; AL = parte decimal (6)
+            CALL MOSTRAR_NUM       ; Mostrar parte decimal si existe
+            
+            ; Mostrar s?mbolo de porcentaje
+            MOV DL, '%'
+            MOV AH, 02h
+            INT 21h
+            
+            POP DX
+            POP BX
+            POP AX
+            RET
+    MOSTRAR_PORCENTAJE ENDP
+    
+    
             
             ; ///////// SUBRUTINA PARA HACER BUBBLE SORT /////////        
     BUBBLE_SORT_NOTAS PROC
@@ -510,7 +628,10 @@ ITS_SORT_CAL:
             POP BX
             POP AX
             RET
-        MOSTRAR_NUM ENDP         
+        MOSTRAR_NUM ENDP 
+
+
+        
     
 ;//////////////////////////////////////////////////////////////// BUSCAR ESTUDIANTE POR POSICION //////////////////////////////////////////////////////   
     INDEX_SEARCH:
