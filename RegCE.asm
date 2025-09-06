@@ -20,7 +20,7 @@ DATA_SEG    SEGMENT ; Inicia el segmento de datos, para almacenar mensajes estat
     MSG7    DB  13,10,'La cantidad de estudiantes reprobados es: $'
     MSG8    DB  13,10,'    Porcentaje(%) $'
     MSG9    DB  10,13,10,'Digite numero de estudiante a mostrar $'
-    MSG10   DB  10,13,10, "Como desea ordenar las calificaciones:", 0ah,"", 0ah, "1. Orden Ascendente.", 0ah, "2. Orden Descendente.", 0ah, "$"
+    MSG10   DB  10,13,10, "Como desea ordenar las calificaciones:", 0ah,"", 0ah, "1. Orden Descendente.", 0ah, "2. Orden Ascendente.", 0ah, "$"
     MSG11   DB  10,13,10, "LLEGO aqui", 0ah, "$"
     MSG12   DB  10,13,10, "Su estudiante se registr? correctamente", 0ah, "$"
     MSG13   DB  "0", 0ah, "$"
@@ -51,6 +51,10 @@ DATA_SEG    SEGMENT ; Inicia el segmento de datos, para almacenar mensajes estat
     LABEL_NOTA DB 13,10,'Nota: ', '$'
     CRLF DB 13,10,'$'
     PRCT DB ' %', '$'     ;simbolo de porcentaje
+    
+    ; PARA OPCION DE ORDEN 
+    ORDEN_OPCION DB 0
+
  
     
 DATA_SEG    ENDS
@@ -650,58 +654,141 @@ ITS_SORT_CAL:
             MOV AH, 01h
             INT 21h ; AL = '1' o '2'
             SUB AL, 30h ; a valor num?rico 1/2
+            MOV ORDEN_OPCION, AL ; Para guardar la opcion 
             
-            ; por ahora solo mostrar nombres 
-            CALL MOSTRAR_NOMBRES_ESTUDIANTES
+            ; LLamar a bubble sort antes de imprimir 
+            
+            CALL BUBBLE_SORT_NOTAS
+            
+            ; Mostrar la lista ordenada
+            CALL MOSTRAR_ESTUDIANTES_Y_NOTAS
             
             JMP MENU_LOOP          ;ESTO POR AHORA QUE NO HAY NADA QUITAR DESPUES
             
             
             
-;////////////////////////////////////////////////////////////////       SUBRUTINAS DE MOSTRAR NOMBRES //////////////////////////////////////////////////////////
+;////////////////////////////////////////////////////////////////       SUBRUTINAS DE MOSTRAR NOMBRES Y LAS NOTAS //////////////////////////////////////////////////////////
 
-    MOSTRAR_NOMBRES_ESTUDIANTES PROC
-            PUSH AX
-            PUSH BX
-            PUSH CX
-            PUSH DX
-            PUSH SI
-            PUSH DI
+      MOSTRAR_ESTUDIANTES_Y_NOTAS PROC
+        PUSH AX
+        PUSH BX
+        PUSH CX
+        PUSH DX
+        PUSH SI
+        PUSH DI
+        
+        MOV CL, CONT_EST    ; cantidad de estudiantes (byte)
+        MOV CH, 0
+        CMP CX, 0
+        
+        
+        ;---- Selecci?n de orden ----
+        ; AL = 1 (asc) o 2 (desc), ya listo en SORT_CAL
+        MOV AL, ORDEN_OPCION
+        CMP AL, 1
+        JE ASCENDENTE
+        CMP AL, 2
+        JE DESCENDENTE
+        
+    ASCENDENTE:
+        LEA SI ,NOTAS_ARR    ; SI apunta al inicio 
+        JMP IMPRIMIR_LISTA
+        
+    DESCENDENTE: 
+        ; calcular posici?n del ?ltimo estudiante
+        MOV BL, CONT_EST
+        DEC BL               ; ?ltimo ?ndice
+        MOV AX, 2 
+        MUL BL               ; AX = 2 * (CONT_EST-1)
+        LEA SI, NOTAS_ARR
+        ADD SI, AX           ; SI apunta al ?ltimo par 
+        JMP IMPRIMIR_LISTA_DESC
+        
+        
+    ;---- Recorrido ASC ----
+    IMPRIMIR_LISTA:
+        MOV CL, CONT_EST
+        MOV CH, 0
+    IMPRIMIR_ASC_LOOP:
+        MOV BL, [SI]        ; ?ndice del estudiante
+        DEC BL              ; convertir a base 0 
+        MOV BH, 0 
+        MOV AX, 43
+        MUL BX              ; AX = 43 * (indice -1)
+        LEA DI, ESTUDIANTES_R
+        ADD DI, AX
+        ADD DI, 1           ; DI --> Nombre
+        
+        ; mostrar nombre
+        MOV DX, DI 
+        MOV AH, 09h
+        INT 21h
+        
+        ; Mostrar -> Nota:
+        LEA DX, LABEL_NOTA
+        MOV AH, 09h
+        INT 21h
+        
+        ; Mostrar nota (segundo byte de NOTAS_ARR)
+        MOV AL, [SI+1]
+        CALL MOSTRAR_NUM
+        
+        ; CRLF
+        LEA DX, CRLF
+        MOV AH, 09h
+        INT 21h
+        
+        ADD SI, 2            ; siguiente par de notas 
+        LOOP IMPRIMIR_ASC_LOOP
+        JMP FIN_MOSTRAR_ESTUD_NOTAS
+        
+        
+    ;---- Recorrido DESC ----
+    IMPRIMIR_LISTA_DESC:
+        MOV CL, CONT_EST
+        MOV CH, 0
+    IMPRIMIR_DESC_LOOP:
+        MOV BL, [SI]    ; ?ndice del estudiante
+        DEC BL 
+        MOV BH, 0
+        MOV AX, 43
+        MUL BX
+        LEA DI, ESTUDIANTES_R
+        ADD DI, AX
+        ADD DI, 1
+        
+        MOV DX, DI
+        MOV AH, 09h
+        INT 21h
+        
+        LEA DX, LABEL_NOTA
+        MOV AH, 09h
+        INT 21h
+        
+        MOV AL, [SI+1]
+        CALL MOSTRAR_NUM
+        
+        LEA DX, CRLF
+        MOV AH, 09h
+        INT 21h
+        
+        SUB SI, 2       ; retrocede en NOTAS_ARR
+        LOOP IMPRIMIR_DESC_LOOP
+        
+        
+        
+    FIN_MOSTRAR_ESTUD_NOTAS:
+        POP DI
+        POP SI
+        POP DX
+        POP CX
+        POP BX
+        POP AX
+        RET
+    MOSTRAR_ESTUDIANTES_Y_NOTAS ENDP
+
             
-            MOV CL, CONT_EST ; cantidad de estudiantes
-            MOV CH, 0
-            CMP CX, 0
-            JE FIN_MOSTRAR_NOMBRES ; si no hay estudiantes salir 
-            
-            LEA DI, ESTUDIANTES_R ; apuntar al inicio de la lista 
-            
-            
-    SIGUIENTE_ESTUDIANTE: 
-            ADD DI, 1  ; saltar el byte del indice 
-            MOV DX, DI ; DX -> nombre
-            MOV AH, 09h
-            INT 21h     ; mostrar el nombre
-            
-            
-            ;Salto de linea entre nombres 
-            LEA DX, CRLF
-            MOV AH, 09h
-            INT 21h
-            
-            
-            ADD DI, 42  ; pasar al siguiente estudiante (43 bytes en total)
-            LOOP SIGUIENTE_ESTUDIANTE
-            
-        FIN_MOSTRAR_NOMBRES:
-            POP DI
-            POP SI
-            POP DX
-            POP CX
-            POP BX
-            POP AX
-            RET
-            
-    MOSTRAR_NOMBRES_ESTUDIANTES ENDP
+    
             
             
             
